@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J.A.R.V.I.S AI Assistant</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: #000;
+            color: #0ff;
+            overflow-x: hidden;
+        }
+        .cyber-border {
+            border: 2px solid #0ff;
+            box-shadow: 0 0 10px #0ff, inset 0 0 10px #0ff;
+        }
+        .cyber-glow {
+            text-shadow: 0 0 10px #0ff;
+        }
+        .typing-effect::after {
+            content: '|';
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        .loading-circle {
+            border: 4px solid #0ff;
+            border-top: 4px solid transparent;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .scanner {
+            background: linear-gradient(to bottom, transparent, #0ff, transparent);
+            animation: scan 2s ease-in-out infinite;
+        }
+        @keyframes scan {
+            0%, 100% { transform: translateY(-100%); }
+            50% { transform: translateY(100%); }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="app" class="p-4">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-6xl cyber-glow mb-4">J.A.R.V.I.S</h1>
+            <p class="text-xl cyber-glow">Advanced AI Assistant</p>
+        </header>
+
+        <!-- Main Interface -->
+        <div class="max-w-4xl mx-auto cyber-border p-6 rounded-lg relative overflow-hidden">
+            <div class="scanner absolute w-full h-8 opacity-20"></div>
+            
+            <!-- Chat Interface -->
+            <div class="chat-container h-96 overflow-y-auto mb-4 cyber-border p-4 rounded">
+                <div class="messages space-y-4" ref="messageContainer">
+                    <div v-for="message in messages" :key="message.id" 
+                         :class="message.sender === 'ai' ? 'text-cyan-400' : 'text-green-400'"
+                         class="p-2 cyber-border rounded">
+                        <p class="typing-effect">{{ message.text }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="flex gap-4">
+                <input v-model="userInput" 
+                       @keyup.enter="sendMessage"
+                       class="flex-1 bg-black cyber-border rounded p-2 text-cyan-400 focus:outline-none focus:border-cyan-600"
+                       placeholder="Ask me anything..."
+                       :disabled="loading">
+                
+                <!-- Voice Input Button -->
+                <button @click="toggleVoiceInput" 
+                        class="cyber-border p-2 rounded hover:bg-cyan-900 transition-colors"
+                        :class="{'bg-red-900': isListening}">
+                    <i class="bi" :class="isListening ? 'bi-mic-fill' : 'bi-mic'"></i>
+                </button>
+
+                <!-- Send Button -->
+                <button @click="sendMessage" 
+                        class="cyber-border p-2 rounded hover:bg-cyan-900 transition-colors"
+                        :disabled="loading">
+                    <i class="bi bi-send"></i>
+                </button>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div v-if="loading" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                <div class="w-16 h-16 rounded-full loading-circle"></div>
+            </div>
+        </div>
+
+        <!-- Features Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+            <div class="cyber-border p-4 rounded text-center hover:bg-cyan-900/20 transition-colors">
+                <i class="bi bi-robot text-4xl mb-2"></i>
+                <h3 class="text-xl mb-2">Advanced AI</h3>
+                <p>Powered by cutting-edge artificial intelligence</p>
+            </div>
+            <div class="cyber-border p-4 rounded text-center hover:bg-cyan-900/20 transition-colors">
+                <i class="bi bi-camera text-4xl mb-2"></i>
+                <h3 class="text-xl mb-2">Vision Analysis</h3>
+                <p>Advanced image recognition capabilities</p>
+            </div>
+            <div class="cyber-border p-4 rounded text-center hover:bg-cyan-900/20 transition-colors">
+                <i class="bi bi-chat-dots text-4xl mb-2"></i>
+                <h3 class="text-xl mb-2">Natural Conversation</h3>
+                <p>Human-like interaction and understanding</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    messages: [
+                        { id: 1, sender: 'ai', text: 'Hello! I am JARVIS, your AI assistant. How can I help you today?' }
+                    ],
+                    userInput: '',
+                    loading: false,
+                    isListening: false,
+                    recognition: null
+                }
+            },
+            mounted() {
+                if ('webkitSpeechRecognition' in window) {
+                    this.recognition = new webkitSpeechRecognition();
+                    this.recognition.continuous = false;
+                    this.recognition.interimResults = false;
+                    
+                    this.recognition.onresult = (event) => {
+                        const transcript = event.results[0][0].transcript;
+                        this.userInput = transcript;
+                        this.sendMessage();
+                    };
+                    
+                    this.recognition.onend = () => {
+                        this.isListening = false;
+                    };
+                }
+            },
+            methods: {
+                async sendMessage() {
+                    if (!this.userInput.trim() || this.loading) return;
+
+                    // Add user message
+                    this.messages.push({
+                        id: Date.now(),
+                        sender: 'user',
+                        text: this.userInput
+                    });
+
+                    const userQuestion = this.userInput;
+                    this.userInput = '';
+                    this.loading = true;
+
+                    try {
+                        const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/ai', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': 'Bearer BjGRNUwMZzNMJ5Dgs0fhJFSgcEi2',
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                messages: [{
+                                    role: 'user',
+                                    content: [{
+                                        type: 'text',
+                                        text: userQuestion
+                                    }]
+                                }]
+                            })
+                        });
+
+                        const data = await response.json();
+                        
+                        this.messages.push({
+                            id: Date.now(),
+                            sender: 'ai',
+                            text: data.message
+                        });
+                    } catch (error) {
+                        console.error('Error:', error);
+                        this.messages.push({
+                            id: Date.now(),
+                            sender: 'ai',
+                            text: 'I apologize, but I encountered an error. Please try again.'
+                        });
+                    } finally {
+                        this.loading = false;
+                        this.$nextTick(() => {
+                            const container = this.$refs.messageContainer;
+                            container.scrollTop = container.scrollHeight;
+                        });
+                    }
+                },
+                toggleVoiceInput() {
+                    if (!this.recognition) {
+                        alert('Speech recognition is not supported in your browser.');
+                        return;
+                    }
+
+                    if (this.isListening) {
+                        this.recognition.stop();
+                    } else {
+                        this.isListening = true;
+                        this.recognition.start();
+                    }
+                }
+            }
+        }).mount('#app')
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
